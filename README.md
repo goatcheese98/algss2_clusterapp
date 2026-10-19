@@ -13,7 +13,13 @@ Rscript scripts/setup.R
 Rscript -e 'shiny::runApp(".", host="127.0.0.1", port=3838, launch.browser=FALSE)'
 ```
 
-Setup downloads exact CRAN source tarballs, checking Archive first and then the current path with the same versioned filename. It fails on missing sources or version mismatches; it never upgrades to a different version. Installation requires network access and system build dependencies. The cloud verification reused the restored dependency installation; a clean Internet install remains to be verified by CI.
+Setup downloads exact CRAN source tarballs, checking Archive first and then the current path with the same versioned filename. It fails on missing sources or version mismatches; it never upgrades to a different version. Installation requires network access and system build dependencies. The cloud verification reused the restored dependency installation. Hosted CI exercises a clean Internet installation; check the PR checks for the exact-head outcome.
+
+## Clustering procedure
+
+Normal analyses retain the original `kmeans(scale(features), centers = k)` semantics: Hartigan-Wong, one start and the default 10 iterations, now within the fixed seed. Original filtered row order is preserved because random center selection depends on it. Constant columns contribute zero distance. Only `k == number of valid rows` uses Lloyd, with one start and the default iteration limit, because Hartigan-Wong rejects that boundary. Reaching the distinct-row count alone does not select Lloyd when duplicate rows remain. Cluster numbers are deterministically relabeled by distance; regression tests compare co-membership with the original call so cosmetic labels do not hide algorithm changes.
+
+The per-game correction is separate: the original checkbox changed chart coordinates while clustering stayed on totals. When enabled, this implementation deliberately divides kills and damage by games **before** clustering to match the existing checkbox intent. Totals mode and the already-rate-based comparison preserve the original feature definitions.
 
 ## Use
 

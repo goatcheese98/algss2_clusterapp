@@ -32,6 +32,14 @@ Live HTTP returned 200 and actual Shiny WebSocket interactions passed at 320/768
 
 ## Limits
 
-Clean network installation of the pinned CRAN sources remains unverified; setup's existing-library path passed. CI is configured to attempt a clean install, and its results must be reported separately from these command exits. R parse/read-only whitespace lint and focused behavior tests are actual checks; no full R static typechecker or separate static-export build is claimed. Successful app startup, HTTP and WebSocket interactions validate the Shiny runtime.
+Setup's existing-library path passed in cloud. A clean installation and the complete hosted suite subsequently passed on predecessor `ba2ba72d` in [workflow run 2](https://github.com/goatcheese98/algss2_clusterapp/actions/runs/39336694722). The correction head requires its own hosted check results; predecessor success is not treated as that result. R parse/read-only whitespace lint and focused behavior tests are actual checks; no full R static typechecker or separate static-export build is claimed. Successful app startup, HTTP and WebSocket interactions validate the Shiny runtime.
 
 Paper remains an unapproved design candidate; original Paper PNGs are unavailable. Keyboard/focus checks do not establish complete screen-reader or WCAG conformance. No production hosting migration was performed.
+
+## Optimization scope correction
+
+The initial draft changed normal analyses to Lloyd with 20 starts and 100 iterations. Coordinator review identified this as exceeding the intended deterministic-seed/validation slice. The correction preserves the original `kmeans(scale(features), centers = k)` procedure: Hartigan-Wong, one start, and the default 10-iteration limit. It also preserves filtered CSV row order because seeded center sampling depends on that order. Only `k == number of valid rows` uses Lloyd, with the original start/iteration defaults; Hartigan-Wong rejects this boundary. Merely reaching the distinct-row count with duplicates does not invoke the fallback. Constant features contribute zero distance, and existing bounds/RNG-restoration checks remain.
+
+The fixed-seed regression fails on the initial draft and passes after correction. It compares co-membership and deterministic distance-based label remapping to the original K-means reference for both comparisons, plus per-game features, at 2/5/8 clusters. The per-game feature correction is deliberate and separate: the old checkbox changed only plot coordinates, while the corrected checkbox changes the clustering inputs too; totals and already-rate-based feature definitions are preserved.
+
+After correction, the cloud R regression suite, R parse/read-only lint, TypeScript typecheck/build and complete live Shiny browser matrix all exited 0. The 16 screenshot captures were refreshed with the corrected procedure. Hosted checks on the correction head are tracked in the draft PR.

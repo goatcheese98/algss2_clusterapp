@@ -67,7 +67,6 @@ analyze_players <- function(players, metric, per_game, clusters, filters) {
   if (!is.numeric(clusters) || length(clusters) != 1L || !is.finite(clusters) || clusters != floor(clusters) || clusters < 1 || clusters > 15) stop("Clusters must be a whole number from 1 to 15.")
   result <- filter_players(players, metric, filters)
   validate_players(result)
-  result <- result[order(result$Player), , drop = FALSE]
   if (metric == metric_choices[1]) {
     result$X <- result$Kills / if (per_game) result$Games else 1
     result$Y <- result$Damage_Dealt / if (per_game) result$Games else 1
@@ -82,13 +81,18 @@ analyze_players <- function(players, metric, per_game, clusters, filters) {
   if (any(!is.finite(features))) stop("Selected metrics must contain finite values.")
   distinct <- nrow(unique(features))
   if (clusters > distinct) stop(sprintf("Clusters (%d) must not exceed valid distinct rows (%d).", clusters, distinct))
-  # Constant features contribute zero distance, avoiding NaN from scale().
-  spread <- apply(features, 2, sd)
-  spread[!is.finite(spread) | spread == 0] <- 1
-  normalized <- sweep(sweep(features, 2, colMeans(features)), 2, spread, "/")
+  # Match scale() from the original analysis; only constant columns need repair.
+  normalized <- scale(features)
+  constant <- apply(features, 2, function(values) length(unique(values)) == 1L)
+  normalized[, constant] <- 0
   if (any(!is.finite(normalized))) stop("Selected metrics cannot be standardized to finite values.")
-  # Lloyd supports k equal to the row count; Hartigan-Wong rejects that boundary.
-  km <- with_analysis_seed(kmeans(normalized, centers = clusters, nstart = 20, algorithm = "Lloyd", iter.max = 100))
+  # Preserve kmeans() defaults: Hartigan-Wong, one start, iter.max = 10.
+  # Hartigan-Wong rejects k == nrow; Lloyd supports that validated boundary.
+  km <- with_analysis_seed(if (clusters == nrow(normalized)) {
+    kmeans(normalized, centers = clusters, algorithm = "Lloyd")
+  } else {
+    kmeans(normalized, centers = clusters)
+  })
   # Keep the original distance-based relabeling, with deterministic row tie breaks.
   ranked <- order(-rowSums(normalized^2), result$Player)
   levels <- unique(km$cluster[ranked])

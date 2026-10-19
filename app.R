@@ -46,7 +46,7 @@ ui <- fluidPage(
       selectInput("player", "Inspect player", choices = character(), selectize = FALSE),
       tags$section(tabindex = "0", `aria-label` = "Selected player details", `aria-live` = "polite", uiOutput("detail"))),
       tags$section(id = "methodology", tags$h2("Methodology"),
-        tags$p("ALGS Year 4 Split 2 Playoffs · Data source: Liquipedia. K-means uses standardized selected metrics, 20 starts and a fixed seed. Per-game mode divides kills and damage by games before clustering; K+A/D and damage difference per game are already rates. Raw filters remain on totals."),
+        tags$p("ALGS Year 4 Split 2 Playoffs · Data source: Liquipedia. K-means uses standardized selected metrics, the original one-start defaults and a fixed seed. Per-game mode divides kills and damage by games before clustering; K+A/D and damage difference per game are already rates. Raw filters remain on totals."),
         tags$p("Cluster numbers are labels, not rankings. Change filters, then run analysis. Reset restores the original example; Clear filters includes the full dataset.")))
   )
 )

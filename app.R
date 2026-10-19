@@ -1,291 +1,144 @@
-# Set a default CRAN mirror
-options(repos = c(CRAN = "https://cloud.r-project.org"))
-
-# List of required packages
-required_packages <- c("dplyr", "ggplot2", "shiny", "plotly", "DT", "shinythemes", "shinydashboard", "shinyWidgets")
-
-# Function to check and install missing packages
-install_if_missing <- function(package) {
-    if (!requireNamespace(package, quietly = TRUE)) {
-        install.packages(package, dependencies = TRUE)
-    }
-}
-
-# Install missing packages
-sapply(required_packages, install_if_missing)
-
-# Load required packages
+source("scripts/dependencies.R")
+check_dependencies()
 library(shiny)
-library(dplyr)
-library(ggplot2)
-library(plotly)
-library(DT)
-library(shinythemes)
-library(shinydashboard)
-library(shinyWidgets)
-
-file_path <- "data/ALGS_Split_2.csv"
-data <- read.csv(file_path)
-
-# Rename columns for clarity and select relevant features
-colnames(data) <- c('Player', 'Games', 'Kills', 'Assists', 'Knocks', 
-                    'Damage_Dealt', 'Damage_Taken', 'Damage_Difference', 
-                    'Ring_Damage', 'Revives', 'Respawns', 'K_D', 'KA_D', 'Survival_Time')
-
-# Convert specific columns to integers (keep Damage_Difference as numeric to allow negative values)
-data <- data %>%
-    mutate(
-        Games = as.integer(Games),
-        Kills = as.integer(Kills),
-        Assists = as.integer(Assists),
-        Knocks = as.integer(Knocks),
-        Damage_Dealt = as.integer(Damage_Dealt),
-        Damage_Taken = as.integer(Damage_Taken),
-        Damage_Difference_per_Game = round(Damage_Difference / Games, 2)  # New column for Damage Difference per Game
-    )
-
-# Predefined color palette for clusters
-color_mapping <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
-                   "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", 
-                   "#aec7e8", "#ffbb78", "#98df8a", "#ff9896", "#c5b0d5")
-
-# Define the UI for the application
-ui <- dashboardPage(
-    dashboardHeader(title = "ALGS Split 2 Playoff Dashboard"),
-    dashboardSidebar(
-        sidebarMenu(
-            menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
-            menuItem("About", tabName = "about", icon = icon("info-circle"))
-        )
-    ),
-    dashboardBody(
-        tabItems(
-            tabItem(tabName = "dashboard",
-                    fluidRow(
-                        box(width = 3,
-                            radioButtons("plot_choice", "Select Plot:",
-                                         choices = c("Kills vs Damage Dealt", "K+A/D vs Damage Difference per Game"),
-                                         selected = "Kills vs Damage Dealt"),
-                            uiOutput("dynamic_sliders"),
-                            sliderTextInput("clusters", "Number of clusters:", 
-                                            choices = seq(1, 15), selected = 5),
-                            materialSwitch("per_game", "Cluster on Per Game Basis", FALSE),
-                            uiOutput("selectedClusterUI")
-                        ),
-                        box(width = 9,
-                            plotlyOutput("clusterPlot", height = "600px")
-                        )
-                    ),
-                    fluidRow(
-                        box(width = 12,
-                            DTOutput("playerTable")
-                        )
-                    )
-            ),
-            tabItem(tabName = "about",
-                    fluidRow(
-                        box(width = 12,
-                            title = "About This Dashboard",
-                            "This dashboard visualizes player performance data from the ALGS Year 4 Split 2 Playoff using K-means clustering. ",
-                            "It allows users to explore relationships between different performance metrics and group players based on their statistics.",
-                            tags$br(), tags$br(),
-                            "Use the controls on the left to adjust the visualization and clustering parameters.",
-                            tags$br(), tags$br(),
-                            "Data source: Liquipedia"
-                        )
-                    )
-            )
-        )
-    )
-)
-
-# Define the server logic
-server <- function(input, output, session) {
-    # Reactive expression for slider ranges
-    slider_ranges <- reactive({
-        list(
-            games = c(min(data$Games), max(data$Games)),
-            kills = c(1, max(data$Kills)),
-            damage_dealt = c(0, max(data$Damage_Dealt)),
-            ka_d = c(0, max(data$KA_D)),
-            damage_diff = c(min(data$Damage_Difference_per_Game), max(data$Damage_Difference_per_Game))
-        )
-    })
-    
-    # Dynamic UI for sliders
-    output$dynamic_sliders <- renderUI({
-        ranges <- slider_ranges()
-        if (input$plot_choice == "Kills vs Damage Dealt") {
-            list(
-                sliderInput("games", "Games Played:", min = ranges$games[1], max = ranges$games[2], 
-                            value = c(24, ranges$games[2]), step = 1),
-                sliderInput("kills", "Kills:", min = ranges$kills[1], max = ranges$kills[2], 
-                            value = c(20, ranges$kills[2]), step = 1),
-                sliderInput("damage_dealt", "Damage Dealt:", min = ranges$damage_dealt[1], max = ranges$damage_dealt[2], 
-                            value = c(0, ranges$damage_dealt[2]), step = 1)
-            )
-        } else {
-            list(
-                sliderInput("ka_d", "K+A/D:", min = ranges$ka_d[1], max = ranges$ka_d[2], 
-                            value = c(2.0, ranges$ka_d[2]), step = 0.01),
-                sliderInput("damage_diff", "Damage Difference per Game:", 
-                            min = ranges$damage_diff[1], max = ranges$damage_diff[2], 
-                            value = c(0, ranges$damage_diff[2]), step = 1)
-            )
-        }
-    })
-    
-    # Reactive expression for filtered data
-    filtered_data <- reactive({
-        req(input$plot_choice)
-        if (input$plot_choice == "Kills vs Damage Dealt") {
-            req(input$kills, input$games, input$damage_dealt)
-            data %>%
-                filter(
-                    Kills >= input$kills[1] & Kills <= input$kills[2],
-                    Damage_Dealt >= input$damage_dealt[1] & Damage_Dealt <= input$damage_dealt[2],
-                    Games >= input$games[1] & Games <= input$games[2]
-                ) %>%
-                mutate(
-                    Kills_per_Game = round(Kills / Games, 2),
-                    Norm_Kills = Kills / max(Kills),
-                    Norm_Damage_Dealt = Damage_Dealt / max(Damage_Dealt)
-                )
-        } else {
-            req(input$ka_d, input$damage_diff)
-            data %>%
-                filter(
-                    KA_D >= input$ka_d[1] & KA_D <= input$ka_d[2],
-                    Damage_Difference_per_Game >= input$damage_diff[1] & Damage_Difference_per_Game <= input$damage_diff[2]
-                ) %>%
-                mutate(
-                    Norm_KA_D = KA_D / max(KA_D),
-                    Norm_Damage_Difference_per_Game = Damage_Difference_per_Game / max(abs(Damage_Difference_per_Game))
-                )
-        }
-    })
-    
-    # Reactive expression for custom clustering
-    clustered_data <- reactive({
-        req(filtered_data())
-        
-        if (input$plot_choice == "Kills vs Damage Dealt") {
-            features <- select(filtered_data(), Kills, Damage_Dealt)
-        } else {
-            features <- select(filtered_data(), KA_D, Damage_Difference_per_Game)
-        }
-        
-        # Normalize features
-        normalized_features <- scale(features)
-        
-        # Calculate distances from origin for each player
-        distances <- sqrt(rowSums(normalized_features^2))
-        
-        # Perform k-means clustering
-        km <- kmeans(normalized_features, centers = as.numeric(input$clusters))
-        
-        # Create a data frame with player info, distances, and initial cluster
-        player_data <- data.frame(
-            Player = filtered_data()$Player,
-            Distance = distances,
-            InitialCluster = km$cluster
-        )
-        
-        # Order players by distance (descending)
-        player_data <- player_data[order(-player_data$Distance), ]
-        
-        # Initialize new cluster assignments
-        new_clusters <- rep(NA, nrow(player_data))
-        
-        # Assign new cluster numbers
-        next_cluster <- 1
-        for (i in 1:nrow(player_data)) {
-            if (is.na(new_clusters[i])) {
-                new_clusters[i] <- next_cluster
-                current_cluster <- player_data$InitialCluster[i]
-                new_clusters[player_data$InitialCluster == current_cluster] <- next_cluster
-                next_cluster <- next_cluster + 1
-            }
-        }
-        
-        # Add new cluster assignments to filtered data
-        result <- filtered_data() %>%
-            mutate(Cluster = factor(new_clusters[match(Player, player_data$Player)]))
-        
-        return(result)
-    })
-    
-    # Update the selected cluster input dynamically
-    output$selectedClusterUI <- renderUI({
-        selectInput("selected_cluster", 
-                    "Selected Cluster for Tabulation:", 
-                    choices = c("All", levels(clustered_data()$Cluster)), 
-                    selected = "All")
-    })
-    
-    # Plot the clustered data
-    output$clusterPlot <- renderPlotly({
-        plot_data <- clustered_data()
-        x_var <- if (input$plot_choice == "Kills vs Damage Dealt") {
-            if (input$per_game) quote(Kills / Games) else quote(Kills)
-        } else quote(KA_D)
-        y_var <- if (input$plot_choice == "Kills vs Damage Dealt") {
-            if (input$per_game) quote(Damage_Dealt / Games) else quote(Damage_Dealt)
-        } else quote(Damage_Difference_per_Game)
-        
-        p <- ggplot(plot_data, aes(x = !!x_var, y = !!y_var, color = Cluster, 
-                                   text = paste("Player:", Player, "<br>",
-                                                "Cluster:", Cluster, "<br>",
-                                                deparse(x_var), ":", round(!!x_var, 2), "<br>",
-                                                deparse(y_var), ":", round(!!y_var, 2)))) +
-            geom_point(size = 3, alpha = 0.7) +
-            scale_color_manual(values = color_mapping[1:input$clusters]) +
-            labs(title = paste("Custom Clustering:", input$plot_choice), 
-                 x = gsub("_", " ", deparse(x_var)), 
-                 y = gsub("_", " ", deparse(y_var))) +
-            theme_minimal() +
-            theme(
-                plot.title = element_text(size = 16, face = "bold"),
-                axis.title = element_text(size = 12),
-                axis.text = element_text(size = 10),
-                legend.title = element_text(size = 12),
-                legend.text = element_text(size = 10)
-            )
-        
-        ggplotly(p, tooltip = "text") %>%
-            layout(legend = list(x = 1.05, y = 0.5),  # Move legend outside the plot
-                   margin = list(r = 150))  # Add right margin for legend
-    })
-    
-    # Display the table of players
-    output$playerTable <- renderDT({
-        req(input$selected_cluster)
-        
-        select_fields <- if (input$plot_choice == "Kills vs Damage Dealt") {
-            c("Player", "Games", "Kills", "Assists", "Knocks", "Damage_Dealt", "Damage_Taken", "Damage_Difference", "Damage_Difference_per_Game", "K_D", "KA_D")
-        } else {
-            c("Player", "KA_D", "Damage_Difference_per_Game", "Kills", "Assists", "Knocks", "Damage_Dealt", "Damage_Taken")
-        }
-        
-        table_data <- if (input$selected_cluster == "All") {
-            clustered_data() %>% arrange(Player)
-        } else {
-            clustered_data() %>% filter(Cluster == input$selected_cluster) %>% arrange(desc(Kills))
-        }
-        
-        datatable(table_data %>% select(all_of(select_fields)),
-                  options = list(pageLength = 10, 
-                                 lengthMenu = c(10, 25, 50), 
-                                 scrollX = TRUE,
-                                 dom = 'Blfrtip',
-                                 buttons = c('copy', 'csv', 'excel', 'pdf', 'print')),
-                  extensions = 'Buttons',
-                  rownames = FALSE) %>%
-            formatStyle(columns = select_fields, 
-                        backgroundColor = styleEqual(levels = levels(clustered_data()$Cluster), 
-                                                     values = adjustcolor(color_mapping[1:input$clusters], alpha.f = 0.2)))
-    })
+source("R/analysis.R")
+players <- load_players("data/ALGS_Split_2.csv")
+defaults <- default_filters(players)
+range_slider <- function(id, label, values, step = 1) {
+  sliderInput(id, label, min = min(values), max = max(values), value = defaults[[id]], step = step, width = "100%")
 }
-
-# Run the application 
-shinyApp(ui = ui, server = server)
+ui <- fluidPage(
+  tags$head(tags$title("ALGS · Player analysis"),
+    tags$link(rel = "stylesheet", href = "lum.css"),
+    tags$script(src = "busy.js", defer = NA)),
+  tags$a(href = "#results", class = "skip-link", "Skip to results"),
+  tags$header(tags$div(class = "topline", tags$strong("ALGS · Player analysis"), tags$a(href = "#methodology", "Methodology")),
+    tags$h1("Find patterns in player performance."),
+    tags$p("Explore standardized features. Clusters describe similarity, not player quality.")),
+  tags$div(class = "workspace",
+    tags$aside(id = "setup", `aria-label` = "Clustering setup",
+      tags$h2("Clustering setup"),
+      selectInput("plot_choice", "Compare metrics", choices = metric_choices, selectize = FALSE),
+      checkboxInput("per_game", "Cluster on per-game metrics", FALSE),
+      numericInput("clusters", "Number of clusters", value = 5, min = 1, max = 15, step = 1),
+      tags$p(class = "muted", "Standardized features · fixed seed"),
+      conditionalPanel("input.plot_choice === 'Kills vs Damage Dealt'",
+        range_slider("games", "Games played", players$Games),
+        range_slider("kills", "Kills", c(1, players$Kills)),
+        range_slider("damage_dealt", "Damage dealt", c(0, players$Damage_Dealt))),
+      conditionalPanel("input.plot_choice !== 'Kills vs Damage Dealt'",
+        range_slider("ka_d", "K+A/D", c(0, players$KA_D), .01),
+        range_slider("damage_diff", "Damage difference per game", players$Damage_Difference_per_Game)),
+      actionButton("run", "Run analysis", class = "primary"),
+      actionButton("reset", "Reset example"), actionButton("clear", "Clear filters")),
+    tags$main(id = "results", tabindex = "-1", `aria-label` = "Analysis results",
+      tags$a(class = "edit-link", href = "#setup", "Edit analysis"),
+      tags$div(role = "status", `aria-live` = "polite", textOutput("status")),
+      tags$div(style = "display:none", textOutput("ready")),
+      conditionalPanel("output.ready === 'true'",
+      tabsetPanel(id = "view", tabPanel("Chart", value = "chart",
+        tags$h2("Performance map"),
+        tags$p("Each shape and color identifies a cluster. The table and player selector provide a keyboard alternative."),
+        plotly::plotlyOutput("clusterPlot", height = "420px")),
+        tabPanel("Table", value = "table", tags$h2("Player statistics"),
+          selectInput("selected_cluster", "Selected cluster for tabulation", "All", selectize = FALSE),
+          tags$div(class = "table-region", role = "region", `aria-label` = "Scrollable player statistics", tabindex = "0", DT::DTOutput("playerTable")))),
+      selectInput("player", "Inspect player", choices = character(), selectize = FALSE),
+      tags$section(tabindex = "0", `aria-label` = "Selected player details", `aria-live` = "polite", uiOutput("detail"))),
+      tags$section(id = "methodology", tags$h2("Methodology"),
+        tags$p("ALGS Year 4 Split 2 Playoffs · Data source: Liquipedia. K-means uses standardized selected metrics, 20 starts and a fixed seed. Per-game mode divides kills and damage by games before clustering; K+A/D and damage difference per game are already rates. Raw filters remain on totals."),
+        tags$p("Cluster numbers are labels, not rankings. Change filters, then run analysis. Reset restores the original example; Clear filters includes the full dataset.")))
+  )
+)
+server <- function(input, output, session) {
+  analysis <- reactiveVal(NULL)
+  status <- reactiveVal("Choose filters, then Run analysis.")
+  current <- reactiveVal(FALSE)
+  filters <- reactive(list(games = input$games, kills = input$kills,
+    damage_dealt = input$damage_dealt, ka_d = input$ka_d, damage_diff = input$damage_diff))
+  observeEvent(list(input$plot_choice, input$per_game, input$clusters, filters()), {
+    current(FALSE)
+    status("Settings changed. Run analysis to view current results.")
+  }, ignoreInit = TRUE, priority = 10)
+  observeEvent(input$run, {
+    current(FALSE)
+    analysis(NULL)
+    status("Running analysis…")
+    result <- tryCatch(analyze_players(players, input$plot_choice, input$per_game, input$clusters, filters()), error = identity)
+    if (inherits(result, "error")) {
+      status(paste(conditionMessage(result), "Adjust settings or Clear filters, then Run analysis to retry."))
+      updateSelectInput(session, "player", choices = character())
+      return()
+    }
+    analysis(result)
+    current(TRUE)
+    status(sprintf("%d players · %d clusters. Analysis complete.", nrow(result$players), result$clusters))
+    updateSelectInput(session, "selected_cluster", choices = c("All", levels(result$players$Cluster)), selected = "All")
+    updateSelectInput(session, "player", choices = result$players$Player, selected = result$players$Player[1])
+  })
+  reset_filters <- function(clear) {
+    values <- default_filters(players, clear)
+    for (id in names(values)) updateSliderInput(session, id, value = values[[id]])
+    if (!clear) {
+      updateSelectInput(session, "plot_choice", selected = metric_choices[1])
+      updateCheckboxInput(session, "per_game", value = FALSE)
+      updateNumericInput(session, "clusters", value = 5)
+    }
+    current(FALSE)
+    status("Filters updated. Run analysis to view results.")
+  }
+  observeEvent(input$reset, reset_filters(FALSE))
+  observeEvent(input$clear, reset_filters(TRUE))
+  output$status <- renderText(status())
+  output$ready <- renderText(if (current()) "true" else "false")
+  outputOptions(output, "ready", suspendWhenHidden = FALSE)
+  visible_result <- reactive({
+    validate(need(current(), "Run analysis to view current results."))
+    req(analysis())
+    analysis()
+  })
+  output$clusterPlot <- plotly::renderPlotly({
+    result <- visible_result()
+    d <- result$players
+    # Shapes distinguish clusters beyond color; black/white outlines aid contrast.
+    colors <- c("#2874b8", "#b45417", "#16845d", "#a74c9f", "#a84142")
+    p <- plotly::plot_ly(d, x = ~X, y = ~Y, color = ~Cluster,
+      colors = rep(colors, length.out = result$clusters), symbol = ~Cluster,
+      symbols = c("circle", "diamond", "square", "cross", "triangle-up", "triangle-down", "x", "star", "hexagon", "pentagon", "hourglass", "bowtie", "triangle-left", "triangle-right", "diamond-open"),
+      text = ~paste(Player, "· Cluster", Cluster), hoverinfo = "text+x+y",
+      type = "scatter", mode = "markers", marker = list(size = 10, line = list(color = "#888888", width = 1)))
+    plotly::config(plotly::layout(p, xaxis = list(title = result$labels[1], automargin = TRUE),
+      yaxis = list(title = result$labels[2], automargin = TRUE),
+      font = list(family = "Geist, sans-serif", size = 13, color = "#66666f"),
+      paper_bgcolor = "rgba(0,0,0,0)", plot_bgcolor = "rgba(0,0,0,0)",
+      legend = list(orientation = "h", y = -.3), margin = list(l = 65, r = 16, t = 16, b = 100)),
+      displayModeBar = FALSE, responsive = TRUE)
+  })
+  table_data <- reactive({
+    d <- visible_result()$players
+    if (!is.null(input$selected_cluster) && input$selected_cluster != "All") d <- d[as.character(d$Cluster) == input$selected_cluster, , drop = FALSE]
+    d[c("Player", "Cluster", "Games", "X", "Y", "Kills", "Assists", "Knocks", "Damage_Dealt", "Damage_Taken", "Damage_Difference", "Damage_Difference_per_Game", "K_D", "KA_D")]
+  })
+  output$playerTable <- DT::renderDT({
+    d <- table_data()
+    labels <- names(d)
+    labels[match(c("X", "Y"), labels)] <- visible_result()$labels
+    DT::datatable(d, colnames = gsub("_", " ", labels), rownames = FALSE, extensions = "Buttons", selection = "single",
+      options = list(pageLength = 10, lengthMenu = c(10, 25, 50), scrollX = TRUE,
+        dom = "Blfrtip", buttons = c("copy", "csv", "excel", "pdf", "print")))
+  }, server = FALSE)
+  observeEvent(input$playerTable_rows_selected, {
+    row <- input$playerTable_rows_selected
+    d <- table_data()
+    if (length(row) == 1 && row >= 1 && row <= nrow(d)) updateSelectInput(session, "player", selected = d$Player[row])
+  })
+  output$detail <- renderUI({
+    result <- visible_result()
+    req(input$player)
+    row <- result$players[result$players$Player == input$player, , drop = FALSE]
+    req(nrow(row) == 1)
+    tags$div(tags$h2(row$Player), tags$p(paste("Cluster", row$Cluster, "·", row$Games, "games")),
+      tags$dl(tags$dt(result$labels[1]), tags$dd(round(row$X, 2)), tags$dt(result$labels[2]), tags$dd(round(row$Y, 2))))
+  })
+}
+shinyApp(ui, server)

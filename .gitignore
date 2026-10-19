@@ -1,4 +1,8 @@
-.Rproj.user
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
+.Rlibrary/
+node_modules/
+__pycache__/
+browser-report.json

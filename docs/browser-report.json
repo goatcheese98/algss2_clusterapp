@@ -1,0 +1,58 @@
+[
+  {
+    "width": 320,
+    "theme": "light",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 1024,
+    "theme": "light",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 1024,
+    "theme": "dark",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "reduced_motion": true,
+    "checks": "repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow",
+    "page_errors": []
+  }
+]

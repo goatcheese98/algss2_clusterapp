@@ -5,4 +5,4 @@
 .Rlibrary/
 node_modules/
 __pycache__/
-browser-report.json
+/browser-report.json

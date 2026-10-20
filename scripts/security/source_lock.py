@@ -5,6 +5,7 @@ output before setup trusts it. CRAN Archive/current may serve the same release.
 """
 import argparse
 import concurrent.futures
+import csv
 import hashlib
 import io
 import json
@@ -46,6 +47,7 @@ def fetch(item):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', default='source-lock.candidate.json')
+    parser.add_argument('--check', type=Path, help='Compare observed hashes against a reviewed TSV; never update it')
     args = parser.parse_args()
     manifest = versions()
     assert len(manifest) == 72, 'Review manifest coverage before updating lock'
@@ -53,4 +55,10 @@ if __name__ == '__main__':
         sources = list(pool.map(fetch, sorted(manifest.items())))
     result = {'schema': 1, 'origin': 'CRAN HTTPS release archives; observed SHA-256, not publisher signatures', 'sources': sources}
     Path(args.output).write_text(json.dumps(result, indent=2) + '\n')
+    if args.check:
+        locked = list(csv.DictReader(args.check.read_text().splitlines(), delimiter='\t'))
+        identity = lambda rows: sorted((r['package'], r['version'], r['sha256']) for r in rows)
+        if identity(locked) != identity(sources):
+            raise ValueError('CRAN sources differ from reviewed source lock')
+        print('All 72 CRAN source archive digests match the reviewed lock')
     print('SOURCE_LOCK_JSON=' + json.dumps(result, separators=(',', ':')))

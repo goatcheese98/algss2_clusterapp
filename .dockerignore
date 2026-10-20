@@ -14,3 +14,5 @@
 !scripts/package-versions.R
 !scripts/start.R
 !scripts/health.R
+!scripts/source-integrity.R
+!scripts/source-lock.tsv

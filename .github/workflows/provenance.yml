@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Collect candidate source digests from CRAN HTTPS
-        run: python scripts/security/source_lock.py
+        run: python scripts/security/source_lock.py --check scripts/source-lock.tsv
       - uses: actions/upload-artifact@v4
         with:
           name: source-lock-candidate

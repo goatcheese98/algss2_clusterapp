@@ -52,3 +52,5 @@ A digest-pinned, non-root container plus validated start/readiness commands is a
 
 
 Run this app on an R/Shiny-capable server such as Shiny Server, Posit Connect or shinyapps.io, with dependencies installed during setup and the CSV packaged alongside `app.R`. WebSockets and a persistent R process are required. Cloudflare Workers cannot execute this R app; no static export or adapter was verified and no Cloudflare deployment configuration is supplied. This change does not deploy to the existing shinyapps.io account or call its provider API.
+
+Runtime inventory, source integrity, advisory coverage and remaining limits: [security preparation](docs/security/README.md).

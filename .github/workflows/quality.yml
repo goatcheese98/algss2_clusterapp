@@ -28,7 +28,8 @@ jobs:
         run: Rscript scripts/setup.R
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck && npm run build && git diff --exit-code -- www/busy.js
-      - run: Rscript scripts/check.R && Rscript tests/analysis.R && Rscript tests/runtime.R
+      - run: Rscript scripts/check.R && Rscript tests/analysis.R && Rscript tests/runtime.R && Rscript tests/source-integrity.R
+      - run: pip install PyYAML==6.0.3 && python tests/security.py
       - run: python tests/health.py
       - name: Install browser test tools
         run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
@@ -59,6 +60,38 @@ jobs:
         env:
           REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
         run: docker build --pull --no-cache --build-arg "VCS_REF=$REVISION" -t algss2-runtime:ci .
+      - name: Inventory and SBOM from built image (repeatability check)
+        run: |
+          python scripts/security/inventory.py algss2-runtime:ci security-evidence
+          python scripts/security/inventory.py algss2-runtime:ci security-evidence/repeated
+          cmp security-evidence/inventory.json security-evidence/repeated/inventory.json
+          cmp security-evidence/sbom.cdx.json security-evidence/repeated/sbom.cdx.json
+          rm -r security-evidence/repeated
+      - name: Install verified scanner and validate security helpers
+        run: |
+          python scripts/security/install_trivy.py
+          pip install PyYAML==6.0.3 jsonschema==4.25.1
+          python tests/security.py
+          python scripts/security/validate_sbom.py security-evidence/sbom.cdx.json
+      - name: Scan Ubuntu OS (raw findings retained)
+        run: |
+          .security-tools/trivy image --cache-dir .security-tools/trivy-cache --image-src docker --db-repository ghcr.io/aquasecurity/trivy-db:2 --scanners vuln --pkg-types os --format json --output security-evidence/os-trivy.json algss2-runtime:ci
+          .security-tools/trivy version --cache-dir .security-tools/trivy-cache --format json > security-evidence/scanner-version.json
+          sha256sum .security-tools/trivy-cache/db/trivy.db > security-evidence/trivy-database.sha256
+          cp .security-tools/trivy-cache/db/metadata.json security-evidence/trivy-database-metadata.json
+          python scripts/security/os_report.py security-evidence/os-trivy.json security-evidence/os-summary.json
+      - name: Scan R Consortium advisory snapshot
+        run: |
+          git clone https://github.com/RConsortium/r-advisory-database.git .security-tools/r-advisories
+          git -C .security-tools/r-advisories checkout --detach 60e8405cfd95ac555e462073877220265b197d3d
+          git -C .security-tools/r-advisories rev-parse origin/HEAD > security-evidence/r-advisory-latest-head.txt
+          python scripts/security/r_advisories.py security-evidence/inventory.json .security-tools/r-advisories security-evidence/r-advisories.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-security-evidence
+          path: security-evidence/
+          retention-days: 14
       - name: Install browser test tools
         run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
       - name: Non-root runtime, health, R regressions and browser smoke

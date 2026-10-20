@@ -1,6 +1,8 @@
 # Explicit setup; never sourced by the app. Requires R 4.5.0 and build tools.
 source("scripts/dependencies.R")
 versions <- dget("scripts/package-versions.R")
+source("scripts/source-integrity.R")
+source_lock <- read_source_lock(versions)
 lib <- Sys.getenv("R_LIBS_USER", unset = "")
 if (!nzchar(lib)) stop("Set R_LIBS_USER to a writable library before setup.")
 dir.create(lib, recursive = TRUE, showWarnings = FALSE)
@@ -19,6 +21,7 @@ for (pkg in names(versions)) {
     if (fetched) break
   }
   if (!fetched) stop(paste("Unable to fetch pinned source:", filename))
+  verify_source(dest, source_lock$sha256[match(pkg, source_lock$package)])
   install.packages(dest, repos = NULL, type = "source", lib = lib)
   if (is.null(installed_version(pkg)) || installed_version(pkg) != numeric_version(versions[[pkg]])) stop(paste("Pinned installation failed:", pkg))
 }

@@ -1,0 +1,102 @@
+{
+  "after_image_id": "sha256:2bbfba1d8afb2760e1c9bfa021e575a49f27c09c3d6bc392fa1b2f713a730b15",
+  "before_image_id": "sha256:53d0eefe0fb15cd766154bf269ba77ea6a200df2867814620ff71c0838392f82",
+  "database_updated_utc": "2026-10-20T01:16:59.036595599Z",
+  "results": {
+    "after": {
+      "kernel_header_high_critical_count": 309,
+      "limits": [
+        "Raw report retains kernel source/header matches; no runtime host kernel is scanned",
+        "Trivy Ubuntu OS coverage does not scan the manually compiled R interpreter or CRAN packages",
+        "Medium/low/unfixed findings remain in the raw report; this gate is not a zero-findings claim"
+      ],
+      "non_kernel_header_high_critical": [],
+      "os": {
+        "Family": "ubuntu",
+        "Name": "24.04"
+      },
+      "raw_report_sha256": "759dbc3c33f5897af1724251c1144a9a8c148de1bde9e9fa202254718cc8e503",
+      "scanned_packages": 279,
+      "schema": 1,
+      "severity_counts": {
+        "CRITICAL": 11,
+        "HIGH": 298,
+        "LOW": 594,
+        "MEDIUM": 1882
+      }
+    },
+    "before": {
+      "kernel_header_high_critical_count": 902,
+      "limits": [
+        "Raw report retains kernel source/header matches; no runtime host kernel is scanned",
+        "Trivy Ubuntu OS coverage does not scan the manually compiled R interpreter or CRAN packages",
+        "Medium/low/unfixed findings remain in the raw report; this gate is not a zero-findings claim"
+      ],
+      "non_kernel_header_high_critical": [
+        {
+          "FixedVersion": "2.4.4-2ubuntu17.4",
+          "InstalledVersion": "2.4.4-2ubuntu17.2",
+          "PkgName": "gpgv",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-68973",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-68973"
+        },
+        {
+          "FixedVersion": "4.5.1+git230720-4ubuntu2.4",
+          "InstalledVersion": "4.5.1+git230720-4ubuntu2.2",
+          "PkgName": "libtiff-doc",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-9900",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-9900"
+        },
+        {
+          "FixedVersion": "4.5.1+git230720-4ubuntu2.4",
+          "InstalledVersion": "4.5.1+git230720-4ubuntu2.2",
+          "PkgName": "libtiff-opengl",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-9900",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-9900"
+        },
+        {
+          "FixedVersion": "4.5.1+git230720-4ubuntu2.4",
+          "InstalledVersion": "4.5.1+git230720-4ubuntu2.2",
+          "PkgName": "libtiff-tools",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-9900",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-9900"
+        },
+        {
+          "FixedVersion": "4.5.1+git230720-4ubuntu2.4",
+          "InstalledVersion": "4.5.1+git230720-4ubuntu2.2",
+          "PkgName": "libtiff6",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-9900",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-9900"
+        },
+        {
+          "FixedVersion": "4.5.1+git230720-4ubuntu2.4",
+          "InstalledVersion": "4.5.1+git230720-4ubuntu2.2",
+          "PkgName": "libtiffxx6",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-9900",
+          "Severity": "HIGH",
+          "VulnerabilityID": "CVE-2025-9900"
+        }
+      ],
+      "os": {
+        "Family": "ubuntu",
+        "Name": "24.04"
+      },
+      "raw_report_sha256": "51686dcff81db3f25f2ed32279d1b246b5d0958b60273ac5b272acafd084f0d2",
+      "scanned_packages": 279,
+      "schema": 1,
+      "severity_counts": {
+        "CRITICAL": 41,
+        "HIGH": 867,
+        "LOW": 1366,
+        "MEDIUM": 5658
+      }
+    }
+  },
+  "scanner": "Trivy 0.76.0, official ghcr.io/aquasecurity/trivy-db:2",
+  "scope": "Cloud-built Ubuntu system stages; before uses reviewed 267dd2e Dockerfile, after adds apt same-release upgrade. R library is not part of this OS-only comparison. Final complete-image scan is CI artifact."
+}

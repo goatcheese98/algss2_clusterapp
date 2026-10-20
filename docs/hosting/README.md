@@ -48,7 +48,7 @@ For a non-container Shiny-capable service, install the pinned manifest in a writ
 
 ## Exact limits
 
-- Base image digest, R version and all 72 R package versions are fixed. Ubuntu apt package patch versions and CRAN tarball checksums are not separately locked; this is repeatable version/setup behavior, not a byte-identical or fully attestable supply chain. Security refreshes require a reviewed rebuild and the same tests.
+- Base image digest, R version and all 72 R package versions are fixed. All 72 CRAN release archive SHA-256 values are locked and checked before clean installation. Ubuntu apt patch versions are refreshed within 24.04 but are not separately frozen; byte-identical builds or signed attestations are not claimed. See [security coverage and evidence](../security/README.md). Security refreshes require a reviewed rebuild and the same tests.
 - The R base itself includes build utilities; this is not a minimal OS image. Extra dependency-build headers are isolated to their build stage. Runtime UID/capabilities/read-only policy constrain writes, but do not establish complete host security.
 - One R process serves sessions. TLS/authentication, orchestration, restart policy, resource sizing under concurrent load, rolling session drain and production monitoring are not implemented or claimed.
 - Original Paper exports and human design approval remain unavailable. This runtime-only slice makes no visual design changes; container browser captures verify the existing LUM candidate with real data.

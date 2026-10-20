@@ -8,3 +8,7 @@ __pycache__/
 /browser-report.json
 
 /runtime-report.json
+
+/.security-tools/
+/security-evidence/
+/source-lock.candidate.json

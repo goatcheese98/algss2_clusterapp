@@ -7,6 +7,7 @@ RUN --mount=type=secret,id=proxy_ca \
       printf 'Acquire::https::CaInfo "/run/secrets/proxy_ca";\n' > /tmp/algss2-apt.conf; \
     fi && \
     apt-get -c /tmp/algss2-apt.conf update && \
+    apt-get -c /tmp/algss2-apt.conf upgrade -y --no-install-recommends && \
     apt-get -c /tmp/algss2-apt.conf install -y --no-install-recommends \
       ca-certificates libcurl4t64 libssl3t64 libxml2 libicu74 zlib1g tini && \
     rm -rf /var/lib/apt/lists/* /tmp/algss2-apt.conf
@@ -23,7 +24,7 @@ RUN --mount=type=secret,id=proxy_ca \
     rm -rf /var/lib/apt/lists/* /tmp/algss2-apt.conf
 WORKDIR /build
 ENV R_LIBS_USER=/opt/algss2/library
-COPY scripts/setup.R scripts/dependencies.R scripts/package-versions.R scripts/
+COPY scripts/setup.R scripts/dependencies.R scripts/package-versions.R scripts/source-integrity.R scripts/source-lock.tsv scripts/
 RUN --mount=type=secret,id=proxy_ca \
     Rscript --vanilla -e 'if (file.exists("/run/secrets/proxy_ca")) Sys.setenv(CURL_CA_BUNDLE="/run/secrets/proxy_ca"); source("scripts/setup.R")'
 
@@ -39,7 +40,7 @@ COPY app.R ./
 COPY R/ R/
 COPY data/ALGS_Split_2.csv data/
 COPY www/ www/
-COPY scripts/start.R scripts/health.R scripts/package-versions.R scripts/dependencies.R scripts/
+COPY scripts/start.R scripts/health.R scripts/package-versions.R scripts/dependencies.R scripts/source-lock.tsv scripts/
 RUN chmod -R a=rX /opt/algss2
 ENV R_LIBS_USER=/opt/algss2/library HOME=/home/shiny XDG_CACHE_HOME=/tmp/algss2-cache PORT=3838
 USER 10001:10001

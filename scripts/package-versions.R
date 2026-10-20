@@ -16,4 +16,4 @@ yaml = "2.3.10", knitr = "1.50", tinytex = "0.56", rmarkdown = "2.29",
 htmlwidgets = "1.6.4", generics = "0.1.3", tidyselect = "1.2.1",
 dplyr = "1.1.4", purrr = "1.0.4", stringi = "1.8.4", stringr = "1.5.1",
 cpp11 = "0.5.2", tidyr = "1.3.1", lazyeval = "0.2.2", crosstalk = "1.2.1",
-data.table = "1.17.0", plotly = "4.10.4", DT = "0.33")
+data.table = "1.17.0", plotly = "4.12.0", DT = "0.33")

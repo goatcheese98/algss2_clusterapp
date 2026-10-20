@@ -28,13 +28,15 @@ jobs:
         run: Rscript scripts/setup.R
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run typecheck && npm run build && git diff --exit-code -- www/busy.js
-      - run: Rscript scripts/check.R && Rscript tests/analysis.R
+      - run: Rscript scripts/check.R && Rscript tests/analysis.R && Rscript tests/runtime.R
+      - run: python tests/health.py
       - name: Install browser test tools
         run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
       - name: Live Shiny browser tests
         run: |
-          Rscript -e 'shiny::runApp(".", host="127.0.0.1", port=3838, launch.browser=FALSE)' > /tmp/shiny.log 2>&1 &
+          Rscript --vanilla scripts/start.R > /tmp/shiny.log 2>&1 &
           for attempt in $(seq 1 30); do curl --fail --silent http://127.0.0.1:3838/ > /dev/null && break; sleep 1; done
+          Rscript --vanilla scripts/health.R
           CHROMIUM=$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path)') python tests/browser.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -44,4 +46,31 @@ jobs:
             docs/design/screens/
             browser-report.json
             /tmp/shiny.log
+          retention-days: 7
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Clean container build (no reused R library)
+        env:
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: docker build --pull --no-cache --build-arg "VCS_REF=$REVISION" -t algss2-runtime:ci .
+      - name: Install browser test tools
+        run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
+      - name: Non-root runtime, health, R regressions and browser smoke
+        env:
+          SCREEN_DIR: ${{ runner.temp }}/runtime-evidence/screens
+          BROWSER_REPORT: ${{ runner.temp }}/runtime-evidence/browser-report.json
+          RUNTIME_REPORT: ${{ runner.temp }}/runtime-evidence/runtime-report.json
+        run: |
+          CHROMIUM=$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path)') python tests/container.py algss2-runtime:ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: non-root-runtime-evidence
+          path: ${{ runner.temp }}/runtime-evidence/
           retention-days: 7

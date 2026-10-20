@@ -48,4 +48,7 @@ See [design provenance](docs/design/README.md) and [verification evidence](docs/
 
 ## Hosting
 
+A digest-pinned, non-root container plus validated start/readiness commands is available. See [runtime build, smoke tests and exact limits](docs/hosting/README.md). The container CI gate performs a clean dependency build and exercises the real Shiny app with a read-only filesystem.
+
+
 Run this app on an R/Shiny-capable server such as Shiny Server, Posit Connect or shinyapps.io, with dependencies installed during setup and the CSV packaged alongside `app.R`. WebSockets and a persistent R process are required. Cloudflare Workers cannot execute this R app; no static export or adapter was verified and no Cloudflare deployment configuration is supplied. This change does not deploy to the existing shinyapps.io account or call its provider API.

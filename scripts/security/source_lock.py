@@ -16,7 +16,7 @@ import urllib.request
 
 
 def versions():
-    return dict(re.findall(r'(\w+)\s*=\s*"([\d.\-]+)"', Path('scripts/package-versions.R').read_text()))
+    return dict(re.findall(r'([A-Za-z][A-Za-z0-9._]*)\s*=\s*"([\d.\-]+)"', Path('scripts/package-versions.R').read_text()))
 
 
 def fetch(item):

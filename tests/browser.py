@@ -47,6 +47,7 @@ with sync_playwright() as p:
             assert page.evaluate('window.busyVerified')
             expect(page.locator('#status')).to_contain_text('83 players · 5 clusters')
             page.wait_for_function("document.querySelectorAll('.scatterlayer .point').length === 83")
+            assert page.evaluate('window.Plotly.version') == '2.25.2', 'Expected the remediated Plotly bundle'
             page.evaluate('document.fonts.ready')
             assert page.evaluate("document.fonts.check('14px Geist') && document.fonts.check('14px \"Geist Mono\"')")
             background = '#ffffff' if theme == 'light' else '#0a0a0b'
@@ -138,7 +139,7 @@ with sync_playwright() as p:
             expect(page.locator('#status')).to_contain_text('83 players')
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             assert not errors, errors
-            report.append({'width': width, 'theme': theme, 'reduced_motion': True, 'checks': 'repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow', 'page_errors': errors})
+            report.append({'width': width, 'theme': theme, 'reduced_motion': True, 'plotly_js': page.evaluate('window.Plotly.version'), 'checks': 'repeat/run/busy/per-game/filter/bounds/empty/reset/table/search/CSV/player/focus/contrast/fonts/no-overflow', 'page_errors': errors})
             print(json.dumps(report[-1]), flush=True)
             context.close()
     browser.close()

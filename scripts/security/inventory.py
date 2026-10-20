@@ -21,7 +21,8 @@ def docker(*args):
 
 
 def run(image, entrypoint, *args):
-    return docker('run', '--rm', '--network', 'none', '--read-only', '--cap-drop=ALL',
+    return docker('run', '--rm', '--network', 'none', '--read-only',
+                  '--tmpfs', '/tmp:rw,nosuid,noexec,size=64m', '--cap-drop=ALL',
                   '--security-opt=no-new-privileges', '--entrypoint', entrypoint, image, *args)
 
 

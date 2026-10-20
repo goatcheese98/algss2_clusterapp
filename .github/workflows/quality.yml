@@ -1,0 +1,110 @@
+name: Scoped quality checks
+on:
+  pull_request:
+  push:
+    branches: [codex/reproducible-lum-shiny]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      R_LIBS_USER: ${{ github.workspace }}/.Rlibrary
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.5.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install system build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+      - name: Restore pinned R dependencies
+        run: Rscript scripts/setup.R
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run typecheck && npm run build && git diff --exit-code -- www/busy.js
+      - run: Rscript scripts/check.R && Rscript tests/analysis.R && Rscript tests/runtime.R && Rscript tests/source-integrity.R
+      - run: pip install PyYAML==6.0.3 && python tests/security.py
+      - run: python tests/health.py
+      - name: Install browser test tools
+        run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
+      - name: Live Shiny browser tests
+        run: |
+          Rscript --vanilla scripts/start.R > /tmp/shiny.log 2>&1 &
+          for attempt in $(seq 1 30); do curl --fail --silent http://127.0.0.1:3838/ > /dev/null && break; sleep 1; done
+          Rscript --vanilla scripts/health.R
+          CHROMIUM=$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path)') python tests/browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cloud-browser-evidence
+          path: |
+            docs/design/screens/
+            browser-report.json
+            /tmp/shiny.log
+          retention-days: 7
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Clean container build (no reused R library)
+        env:
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: docker build --pull --no-cache --build-arg "VCS_REF=$REVISION" -t algss2-runtime:ci .
+      - name: Inventory and SBOM from built image (repeatability check)
+        run: |
+          python scripts/security/inventory.py algss2-runtime:ci security-evidence
+          python scripts/security/inventory.py algss2-runtime:ci security-evidence/repeated
+          cmp security-evidence/inventory.json security-evidence/repeated/inventory.json
+          cmp security-evidence/sbom.cdx.json security-evidence/repeated/sbom.cdx.json
+          rm -r security-evidence/repeated
+          python tests/inventory_binding.py algss2-runtime:ci security-evidence/inventory-binding.json
+      - name: Install verified scanner and validate security helpers
+        run: |
+          python scripts/security/install_trivy.py
+          pip install PyYAML==6.0.3 jsonschema==4.25.1
+          python tests/security.py
+          python scripts/security/validate_sbom.py security-evidence/sbom.cdx.json
+      - name: Scan Ubuntu OS (raw findings retained)
+        run: |
+          .security-tools/trivy image --cache-dir .security-tools/trivy-cache --image-src docker --db-repository ghcr.io/aquasecurity/trivy-db:2 --scanners vuln --pkg-types os --format json --output security-evidence/os-trivy.json algss2-runtime:ci
+          .security-tools/trivy version --cache-dir .security-tools/trivy-cache --format json > security-evidence/scanner-version.json
+          sha256sum .security-tools/trivy-cache/db/trivy.db > security-evidence/trivy-database.sha256
+          cp .security-tools/trivy-cache/db/metadata.json security-evidence/trivy-database-metadata.json
+          python scripts/security/os_report.py security-evidence/os-trivy.json security-evidence/os-summary.json
+      - name: Scan R Consortium advisory snapshot
+        run: |
+          git clone https://github.com/RConsortium/r-advisory-database.git .security-tools/r-advisories
+          git -C .security-tools/r-advisories checkout --detach 60e8405cfd95ac555e462073877220265b197d3d
+          git -C .security-tools/r-advisories rev-parse origin/HEAD > security-evidence/r-advisory-latest-head.txt
+          python scripts/security/r_advisories.py security-evidence/inventory.json .security-tools/r-advisories security-evidence/r-advisories.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-security-evidence
+          path: security-evidence/
+          retention-days: 14
+      - name: Install browser test tools
+        run: pip install playwright==1.55.0 && python -m playwright install --with-deps chromium
+      - name: Non-root runtime, health, R regressions and browser smoke
+        env:
+          SCREEN_DIR: ${{ runner.temp }}/runtime-evidence/screens
+          BROWSER_REPORT: ${{ runner.temp }}/runtime-evidence/browser-report.json
+          RUNTIME_REPORT: ${{ runner.temp }}/runtime-evidence/runtime-report.json
+        run: |
+          CHROMIUM=$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path)') python tests/container.py algss2-runtime:ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: non-root-runtime-evidence
+          path: ${{ runner.temp }}/runtime-evidence/
+          retention-days: 7

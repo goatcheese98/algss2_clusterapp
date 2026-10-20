@@ -1,117 +1,56 @@
-# [ALGS Split 2 Playoff Dashboard](https://3fq328-rohan-jasani.shinyapps.io/ClusteringApp/)
+# ALGS Split 2 player analysis
 
-## Description
+R/Shiny exploration of the existing ALGS Year 4 Split 2 Playoffs dataset from [Liquipedia](https://liquipedia.net/apexlegends/Apex_Legends_Global_Series/2024/Split_2/Playoffs). Cluster labels describe similarity, not player quality.
 
-This Shiny app creates an interactive dashboard for visualizing and analyzing player performance data from the Apex Legends Global Series (ALGS) Year 4 Split 2 Playoff. It uses K-means clustering to group players based on various performance metrics.
+## Reproducible setup
 
-## Setup and Running the App
+Use R **4.5.0**, a C/C++ toolchain, and development libraries for curl, OpenSSL and XML. The runtime never installs packages or changes CRAN options. `scripts/package-versions.R` pins all 72 non-base dependencies in installation order; `scripts/dependencies.R` checks the four direct runtime versions. Base/recommended libraries come from R 4.5.0. `renv` was unavailable in the cloud runtime, so this slice uses an explicit manifest rather than an untested renv bootstrap.
 
-1. Ensure you have R installed on your system.
-2. Clone this repository or download the `app.R` file.
-3. Place the `ALGS_Split_2.csv` file in a `data` subdirectory.
-4. Open R or RStudio and set your working directory to where `app.R` is located.
-5. Run the entire code in the `app.R` file.
-
-The app includes a package management section at the beginning:
-
-```r
-# Set a default CRAN mirror
-options(repos = c(CRAN = "https://cloud.r-project.org"))
-
-# List of required packages
-required_packages <- c("dplyr", "ggplot2", "shiny", "plotly", "DT", "shinythemes", "shinydashboard", "shinyWidgets")
-
-# Function to check and install missing packages
-install_if_missing <- function(package) {
-    if (!requireNamespace(package, quietly = TRUE)) {
-        install.packages(package, dependencies = TRUE)
-    }
-}
-
-# Install missing packages
-sapply(required_packages, install_if_missing)
+```sh
+export R_LIBS_USER="$PWD/.Rlibrary"
+mkdir -p "$R_LIBS_USER"
+Rscript scripts/setup.R
+Rscript -e 'shiny::runApp(".", host="127.0.0.1", port=3838, launch.browser=FALSE)'
 ```
 
-This code does the following:
-- Sets a default CRAN mirror for package downloads.
-- Defines a list of required packages for the app.
-- Creates a function `install_if_missing` that checks if a package is installed and installs it if it's not.
-- Uses `sapply` to apply this function to all required packages, ensuring they are installed.
+Setup downloads exact CRAN source tarballs, checking Archive first and then the current path with the same versioned filename. It fails on missing sources or version mismatches; it never upgrades to a different version. Installation requires network access and system build dependencies. The cloud verification reused the restored dependency installation. Hosted CI exercises a clean Internet installation; check the PR checks for the exact-head outcome.
 
-By running the entire `app.R` file, you'll automatically install any missing packages and launch the Shiny app.
+## Clustering procedure
 
-## Features
+Normal analyses retain the original `kmeans(scale(features), centers = k)` semantics: Hartigan-Wong, one start and the default 10 iterations, now within the fixed seed. Original filtered row order is preserved because random center selection depends on it. Constant columns contribute zero distance. Only `k == number of valid rows` uses Lloyd, with one start and the default iteration limit, because Hartigan-Wong rejects that boundary. Reaching the distinct-row count alone does not select Lloyd when duplicate rows remain. Cluster numbers are deterministically relabeled by distance; regression tests compare co-membership with the original call so cosmetic labels do not hide algorithm changes.
 
-- Interactive scatter plots with options for "Kills vs Damage Dealt" and "K+A/D vs Damage Difference per Game"
-- Adjustable K-means clustering (1-15 clusters)
-- Data filtering using dynamic sliders
-- Detailed player statistics table with export options
-- Responsive design using Shiny Dashboard
+The per-game correction is separate: the original checkbox changed chart coordinates while clustering stayed on totals. When enabled, this implementation deliberately divides kills and damage by games **before** clustering to match the existing checkbox intent. Totals mode and the already-rate-based comparison preserve the original feature definitions.
 
-## Usage
+## Use
 
-1. Plot Selection:
-   - Use the radio buttons to choose between two plot types:
-     - "Kills vs Damage Dealt": Compares player kills to damage dealt
-     - "K+A/D vs Damage Difference per Game": Compares Kill+Assist/Death ratio to damage difference per game
+Choose either metric comparison, its original range filters, per-game mode and 1–15 clusters, then **Run analysis**. Per-game mode now changes both clustering and plotted kills/damage. The rate comparison already uses K+A/D and damage difference per game. Filters continue to use the original totals/rates. Settings changes invalidate displayed results until Run succeeds. **Reset example** restores the original defaults; **Clear filters** includes all players. Empty or invalid selections explain the constraint without leaving stale results visible.
 
-2. Data Filtering:
-   - Adjust the dynamic sliders to filter player data:
-     - For "Kills vs Damage Dealt":
-       - Games Played: Set minimum and maximum number of games
-       - Kills: Set minimum and maximum number of kills
-       - Damage Dealt: Set minimum and maximum damage dealt
-     - For "K+A/D vs Damage Difference per Game":
-       - K+A/D: Set minimum and maximum Kill+Assist/Death ratio
-       - Damage Difference per Game: Set minimum and maximum damage difference
+Chart shapes and colors identify clusters. Use **Table** for search, sorting, cluster filtering and copy/CSV/Excel/PDF/print exports. **Inspect player** offers native keyboard access to details. Controls stack below 768px; the statistics region deliberately scrolls horizontally. Light/dark follows system settings, and reduced motion disables transitions. Geist and Geist Mono are self-hosted with their OFL license.
 
-3. Clustering:
-   - Use the "Number of clusters" slider to adjust the K-means clustering (1-15 clusters)
-   - Toggle "Cluster on Per Game Basis" to normalize metrics by the number of games played
+## Checks
 
-4. Visualization:
-   - The scatter plot updates dynamically based on your selections
-   - Each point represents a player, colored by their assigned cluster
-   - Hover over points to see detailed player information:
-     - Player name
-     - Cluster number
-     - X and Y axis values (depending on the selected plot type)
+Node is needed only to compile the small strict TypeScript accessibility/lifecycle helper. Application logic remains R; this is not a full-repository TypeScript migration.
 
-5. Player Statistics:
-   - Use the "Selected Cluster for Tabulation" dropdown to view statistics for:
-     - All players
-     - Players in a specific cluster
-   - The data table below the plot shows detailed player statistics
-   - Use the search bar to find specific players
-   - Click column headers to sort the data
-   - Use pagination controls to navigate through the data
-   - Export options (copy, CSV, Excel, PDF, print) are available above the table
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm run build
+Rscript scripts/check.R
+Rscript tests/analysis.R
+pip install playwright==1.55.0
+# Start Shiny in another cloud terminal first; set CHROMIUM for your cloud browser.
+CHROMIUM=/usr/bin/chromium python tests/browser.py
+```
 
-6. About Page:
-   - Click the "About" menu item in the sidebar to view information about the dashboard and data source
+`check.R` parses all R sources and checks trailing whitespace; it also runs codetools usage analysis when available. It is not a full R typechecker. The browser test exercises the live WebSocket app at 320/768/1024/1440 in both themes with reduced motion, including repeatability, controls, errors, reset, CSV contents and keyboard detail selection. CI has a 20-minute bound and read-only repository permissions. Screenshots support the behavior checks; they are not the test oracle.
 
-7. Interpreting the Results:
-   - Players clustered together have similar performance characteristics
-   - The number of clusters can significantly change the groupings, so experiment with different values
-   - Consider how the "Cluster on Per Game Basis" toggle affects the results, especially for players with varying numbers of games played
+See [design provenance](docs/design/README.md) and [verification evidence](docs/verification.md).
 
-8. Performance Considerations:
-   - Adjusting filters and clustering parameters may take a moment to update, especially with larger datasets
-   - If the app becomes unresponsive, try reducing the number of clusters or narrowing your data filters
+## Hosting
 
-Remember, this dashboard is a tool for exploration. Experiment with different combinations of filters and clustering parameters to uncover insights about player performance in the ALGS Split 2 Playoff.
+A digest-pinned, non-root container plus validated start/readiness commands is available. See [runtime build, smoke tests and exact limits](docs/hosting/README.md). The container CI gate performs a clean dependency build and exercises the real Shiny app with a read-only filesystem.
 
-## Data
 
-The app uses `ALGS_Split_2.csv`, which should be placed in a `data` subdirectory. Ensure this file is present before running the app.
+Run this app on an R/Shiny-capable server such as Shiny Server, Posit Connect or shinyapps.io, with dependencies installed during setup and the CSV packaged alongside `app.R`. WebSockets and a persistent R process are required. Cloudflare Workers cannot execute this R app; no static export or adapter was verified and no Cloudflare deployment configuration is supplied. This change does not deploy to the existing shinyapps.io account or call its provider API.
 
-## About
-
-This dashboard visualizes ALGS Year 4 Split 2 Playoff data, allowing users to explore performance metrics and group players using K-means clustering. Use the left-side controls to adjust visualization and clustering parameters.
-
-Data source: [Apex Legends Global Series Year 4 Split 2 Playoffs tables from Liquipedia](https://liquipedia.net/apexlegends/Apex_Legends_Global_Series/2024/Split_2/Playoffs)
-
-## Contact
-
-Rohan Jasani
-jasani.rohan@gmail.com
+Runtime inventory, source integrity, advisory coverage and remaining limits: [security preparation](docs/security/README.md).

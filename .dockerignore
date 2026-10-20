@@ -1,0 +1,18 @@
+# Allow only production source and pinned setup inputs into the build context.
+**
+!Dockerfile
+!app.R
+!R/
+!R/*.R
+!data/
+!data/ALGS_Split_2.csv
+!www/
+!www/**
+!scripts/
+!scripts/setup.R
+!scripts/dependencies.R
+!scripts/package-versions.R
+!scripts/start.R
+!scripts/health.R
+!scripts/source-integrity.R
+!scripts/source-lock.tsv

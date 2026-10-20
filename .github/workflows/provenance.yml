@@ -1,0 +1,23 @@
+name: Source provenance collection
+on:
+  push:
+    branches: [codex/reproducible-lum-shiny]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect candidate source digests from CRAN HTTPS
+        run: python scripts/security/source_lock.py --check scripts/source-lock.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-lock-candidate
+          path: source-lock.candidate.json
+          retention-days: 7

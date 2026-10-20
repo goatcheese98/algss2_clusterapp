@@ -1,5 +1,9 @@
 """Advisory range boundaries and fail-closed coverage checks."""
 import importlib.util
+import csv
+import io
+import json
+from unittest.mock import patch
 from pathlib import Path
 import unittest
 
@@ -22,6 +26,40 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(len(versions), 72)
         self.assertEqual(versions['data.table'], '1.17.0')
         self.assertNotIn('table', versions)
+
+    def test_checkout_digest_cannot_relabel_image_sources(self):
+        tool = module('inventory')
+        embedded = Path('scripts/source-lock.tsv').read_bytes()
+        rows = list(csv.DictReader(embedded.decode().splitlines(), delimiter='\t'))
+        changed_rows = [dict(row) for row in rows]
+        digest = changed_rows[0]['sha256']
+        changed_rows[0]['sha256'] = ('0' if digest[0] != '0' else '1') + digest[1:]
+        buffer = io.StringIO(newline='')
+        writer = csv.DictWriter(buffer, fieldnames=list(rows[0]), delimiter='\t', lineterminator='\n')
+        writer.writeheader(); writer.writerows(changed_rows)
+        changed = buffer.getvalue().encode()
+        self.assertEqual(sum(a != b for a, b in zip(embedded, changed)), 1)
+        self.assertEqual([(r['package'], r['version']) for r in rows],
+                         [(r['package'], r['version']) for r in changed_rows])
+        image_id = 'sha256:' + 'a' * 64  # Explicit unit fixture; actual-image regression runs in CI.
+        info = [{'Id': image_id, 'Config': {'Labels': {'org.opencontainers.image.revision': 'fixture'}}}]
+        def image_read(image, entrypoint, *args, **kwargs):
+            if entrypoint == 'cat' and args == ('/opt/algss2/app/scripts/source-lock.tsv',):
+                return embedded
+            if entrypoint == 'cat':
+                return 'ID=ubuntu\nVERSION_ID="24.04"\n'
+            if entrypoint == 'dpkg-query':
+                return 'fixture\t1\tamd64\tfixture\t1\tii \n'
+            return json.dumps({'version': '4.5.0', 'packages': [
+                {'name': r['package'], 'version': r['version'], 'priority': 'CRAN'} for r in rows]})
+        with patch.object(tool, 'docker', return_value=json.dumps(info)), \
+             patch.object(tool, 'run', side_effect=image_read) as read, \
+             patch.object(tool.Path, 'read_bytes', return_value=changed), \
+             patch.object(tool, 'write') as write:
+            with self.assertRaisesRegex(ValueError, 'Image source lock differs from checkout source lock'):
+                tool.inventory('movable:tag', Path('unused-unit-output'))
+            read.assert_called_once_with(image_id, 'cat', '/opt/algss2/app/scripts/source-lock.tsv', binary=True)
+            write.assert_not_called()
 
     def test_r_numeric_order(self):
         self.assertLess(r.version('4.9.0'), r.version('4.10.4'))

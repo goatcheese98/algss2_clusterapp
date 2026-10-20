@@ -67,6 +67,7 @@ jobs:
           cmp security-evidence/inventory.json security-evidence/repeated/inventory.json
           cmp security-evidence/sbom.cdx.json security-evidence/repeated/sbom.cdx.json
           rm -r security-evidence/repeated
+          python tests/inventory_binding.py algss2-runtime:ci security-evidence/inventory-binding.json
       - name: Install verified scanner and validate security helpers
         run: |
           python scripts/security/install_trivy.py

@@ -13,17 +13,17 @@ import subprocess
 from urllib.parse import quote
 
 
-def docker(*args):
+def docker(*args, binary=False):
     env = os.environ.copy()
     for key in ('DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_TLS', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH'):
         env.pop(key, None)
-    return subprocess.check_output(['docker', '--host=unix:///var/run/docker.sock', *args], env=env, text=True)
+    return subprocess.check_output(['docker', '--host=unix:///var/run/docker.sock', *args], env=env, text=not binary)
 
 
-def run(image, entrypoint, *args):
+def run(image, entrypoint, *args, binary=False):
     return docker('run', '--rm', '--network', 'none', '--read-only',
                   '--tmpfs', '/tmp:rw,nosuid,noexec,size=64m', '--cap-drop=ALL',
-                  '--security-opt=no-new-privileges', '--entrypoint', entrypoint, image, *args)
+                  '--security-opt=no-new-privileges', '--entrypoint', entrypoint, image, *args, binary=binary)
 
 
 def write(path, value):
@@ -32,6 +32,11 @@ def write(path, value):
 
 def inventory(image, output):
     image_info = json.loads(docker('image', 'inspect', image))[0]
+    # Pin every read to the inspected immutable ID, even if a tag moves.
+    image = image_info['Id']
+    lock_bytes = run(image, 'cat', '/opt/algss2/app/scripts/source-lock.tsv', binary=True)
+    if lock_bytes != Path('scripts/source-lock.tsv').read_bytes():
+        raise ValueError('Image source lock differs from checkout source lock; refusing source hash attribution')
     query = '${binary:Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\t${db:Status-Abbrev}\n'
     packages = []
     for line in run(image, 'dpkg-query', '-W', '-f=' + query).splitlines():
@@ -43,7 +48,6 @@ def inventory(image, output):
     packages.sort(key=lambda p: p['name'])
     r_code = '''p <- installed.packages(noCache = TRUE); p <- p[order(p[, "Package"], p[, "Version"]), , drop = FALSE]; cat(jsonlite::toJSON(list(version = as.character(getRversion()), packages = unname(lapply(seq_len(nrow(p)), function(i) list(name = p[i, "Package"], version = p[i, "Version"], priority = if (is.na(p[i, "Priority"])) "CRAN" else p[i, "Priority"])))), auto_unbox = TRUE))'''
     r = json.loads(run(image, 'Rscript', '--vanilla', '-e', r_code))
-    lock_bytes = Path('scripts/source-lock.tsv').read_bytes()
     sources = {s['package']: s for s in csv.DictReader(lock_bytes.decode().splitlines(), delimiter='\t')}
     found = {p['name']: p['version'] for p in r['packages']}
     assert len(sources) == 72 and all(found.get(n) == s['version'] for n, s in sources.items())
@@ -73,7 +77,8 @@ def inventory(image, output):
                 metadata={'component': {'type': 'container', 'name': 'algss2-runtime', 'version': image_info['Id'], 'bom-ref': 'runtime'}},
                 components=components, dependencies=[{'ref': 'runtime', 'dependsOn': [c['bom-ref'] for c in components]}])
     write(output / 'sbom.cdx.json', sbom)
-    print(json.dumps({'os_packages': len(packages), 'r_packages': len(r['packages']), 'pinned_cran': len(sources), 'image_id': image_info['Id']}))
+    print(json.dumps({'os_packages': len(packages), 'r_packages': len(r['packages']), 'pinned_cran': len(sources), 'image_id': image_info['Id'],
+                      'source_lock_sha256': result['source_lock_sha256']}))
 
 
 if __name__ == '__main__':

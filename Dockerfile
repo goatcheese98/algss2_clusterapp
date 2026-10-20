@@ -8,7 +8,7 @@ RUN --mount=type=secret,id=proxy_ca \
     fi && \
     apt-get -c /tmp/algss2-apt.conf update && \
     apt-get -c /tmp/algss2-apt.conf install -y --no-install-recommends \
-      ca-certificates libcurl4t64 libssl3t64 libxml2 libicu74 tini && \
+      ca-certificates libcurl4t64 libssl3t64 libxml2 libicu74 zlib1g tini && \
     rm -rf /var/lib/apt/lists/* /tmp/algss2-apt.conf
 
 FROM system AS dependencies
@@ -19,7 +19,7 @@ RUN --mount=type=secret,id=proxy_ca \
     fi && \
     apt-get -c /tmp/algss2-apt.conf update && \
     apt-get -c /tmp/algss2-apt.conf install -y --no-install-recommends \
-      libcurl4-openssl-dev libssl-dev libxml2-dev libicu-dev pkg-config && \
+      libcurl4-openssl-dev libssl-dev libxml2-dev libicu-dev zlib1g-dev pkg-config && \
     rm -rf /var/lib/apt/lists/* /tmp/algss2-apt.conf
 WORKDIR /build
 ENV R_LIBS_USER=/opt/algss2/library
